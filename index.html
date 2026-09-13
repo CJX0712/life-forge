@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeForge · 生命游戏锻造炉</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --border:#30363d; --txt:#e6edf3;
+    --muted:#8b949e; --accent:#58a6ff; --live:#3fb950; --dead:#0d1117;
+    --warn:#f0883e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;}
+  .wrap{max-width:1040px;margin:0 auto;padding:20px;}
+  h1{font-size:20px;margin:0 0 4px;letter-spacing:.5px;}
+  h1 .v{color:var(--accent);}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px;}
+  .layout{display:grid;grid-template-columns:1fr 280px;gap:16px;}
+  @media(max-width:820px){.layout{grid-template-columns:1fr;}}
+  .stage{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated;background:var(--dead);
+    border:1px solid var(--border);border-radius:4px;}
+  .side{display:flex;flex-direction:column;gap:12px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  .card h2{font-size:12px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  button{background:#21262d;color:var(--txt);border:1px solid var(--border);border-radius:6px;
+    padding:7px 10px;font-size:12px;cursor:pointer;font-family:inherit;}
+  button:hover{border-color:var(--accent);}
+  button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;}
+  button.warn{border-color:var(--warn);color:var(--warn);}
+  input[type=text],input[type=number]{width:100%;background:#0d1117;color:var(--txt);
+    border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:12px;font-family:inherit;}
+  label{font-size:11px;color:var(--muted);display:block;margin:8px 0 4px;}
+  .stats{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;
+    border-bottom:1px dashed var(--border);}
+  .stats:last-child{border-bottom:none;}
+  .stats b{color:var(--accent);}
+  .pat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .pat button{padding:6px 4px;font-size:11px;}
+  .hint{font-size:11px;color:var(--muted);line-height:1.6;}
+  .self{font-size:11px;line-height:1.7;}
+  .self .ok{color:var(--live);}
+  .self .bad{color:#f85149;}
+  .seedline{display:flex;gap:6px;}
+  .seedline input{flex:1;}
+  code.k{color:var(--warn);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LifeForge <span class="v">·</span> 生命游戏锻造炉</h1>
+  <div class="sub">标准 B3/S23 规则 · 环面边界 · 确定性种子 · 单文件离线运行 — <a href="https://github.com/CJX0712/life-forge" style="color:var(--accent)">github.com/CJX0712/life-forge</a></div>
+
+  <div class="layout">
+    <div class="stage">
+      <canvas id="cv" width="640" height="640"></canvas>
+      <div class="row" style="margin-top:12px;">
+        <button id="play" class="primary">▶ 播放</button>
+        <button id="step">⏭ 单步</button>
+        <button id="clear" class="warn">清空</button>
+        <button id="rand">🎲 随机</button>
+      </div>
+      <label>速度（代/秒）</label>
+      <input id="speed" type="range" min="1" max="60" value="12">
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>状态</h2>
+        <div class="stats"><span>世代</span><b id="gen">0</b></div>
+        <div class="stats"><span>存活细胞</span><b id="pop">0</b></div>
+        <div class="stats"><span>网格</span><b id="dim">80 × 80</b></div>
+      </div>
+
+      <div class="card">
+        <h2>经典图案</h2>
+        <div class="pat">
+          <button data-pat="block">方块</button>
+          <button data-pat="blinker">闪烁器</button>
+          <button data-pat="glider">滑翔机</button>
+          <button data-pat="toad">蟾蜍</button>
+          <button data-pat="beacon">信标</button>
+          <button data-pat="pulsar">脉冲星</button>
+        </div>
+        <div class="hint" style="margin-top:8px;">点击后在网格中心放置。滑翔机会沿对角线平移。</div>
+      </div>
+
+      <div class="card">
+        <h2>确定性种子</h2>
+        <div class="seedline">
+          <input id="seed" type="text" placeholder="任意文字/数字" value="晨星">
+        </div>
+        <label>填充密度 <span id="densv">0.33</span></label>
+        <input id="dens" type="range" min="5" max="80" value="33">
+        <div class="row" style="margin-top:8px;">
+          <button id="seedbtn">用种子生成</button>
+        </div>
+        <div class="hint" style="margin-top:6px;">同一种子永远生成同一片混沌宇宙。</div>
+      </div>
+
+      <div class="card">
+        <h2>内置自检</h2>
+        <div class="self" id="selfcheck">点击「运行自检」验证引擎规则正确性。</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="selftest">运行自检</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="engine">
+// ===== LifeForge engine (pure, headless-extractable) =====
+const Life = {
+  W: 80, H: 80,
+  create(w, h){
+    w = w || this.W; h = h || this.H;
+    return { w, h, grid: new Uint8Array(w * h), gen: 0 };
+  },
+  idx(s, x, y){
+    const xx = ((x % s.w) + s.w) % s.w;
+    const yy = ((y % s.h) + s.h) % s.h;
+    return yy * s.w + xx;
+  },
+  get(s, x, y){ return s.grid[this.idx(s, x, y)]; },
+  set(s, x, y, v){ s.grid[this.idx(s, x, y)] = v ? 1 : 0; },
+  clear(s){ s.grid.fill(0); s.gen = 0; },
+  // one generation, toroidal B3/S23
+  step(s){
+    const n = new Uint8Array(s.w * s.h);
+    for (let y = 0; y < s.h; y++){
+      for (let x = 0; x < s.w; x++){
+        let c = 0;
+        for (let dy = -1; dy <= 1; dy++){
+          for (let dx = -1; dx <= 1; dx++){
+            if (dx === 0 && dy === 0) continue;
+            c += s.grid[this.idx(s, x + dx, y + dy)];
+          }
+        }
+        const alive = s.grid[this.idx(s, x, y)];
+        n[y * s.w + x] = alive ? ((c === 2 || c === 3) ? 1 : 0) : (c === 3 ? 1 : 0);
+      }
+    }
+    s.grid = n;
+    s.gen++;
+    return s;
+  },
+  pop(s){ let p = 0; for (let i = 0; i < s.grid.length; i++) p += s.grid[i]; return p; },
+  // deterministic seeded fill via LCG
+  random(s, seedStr, density){
+    density = (density == null) ? 0.33 : density;
+    let st = 0; const str = String(seedStr);
+    for (let i = 0; i < str.length; i++) st = (st * 31 + str.charCodeAt(i)) >>> 0;
+    st = st || 0x9e3779b9;
+    const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    for (let i = 0; i < s.grid.length; i++) s.grid[i] = rnd() < density ? 1 : 0;
+    s.gen = 0;
+    return s;
+  },
+  // place a named pattern centered at (cx,cy), auto-centered by its own bounding box
+  putPattern(s, name, cx, cy){
+    cx = (cx == null) ? (s.w >> 1) : cx;
+    cy = (cy == null) ? (s.h >> 1) : cy;
+    const P = {
+      block:   [[0,0],[1,0],[0,1],[1,1]],
+      blinker: [[0,0],[1,0],[2,0]],
+      glider:  [[1,0],[2,1],[0,2],[1,2],[2,2]],
+      toad:    [[1,0],[2,0],[3,0],[0,1],[1,1],[2,1]],
+      beacon:  [[0,0],[1,0],[0,1],[1,1],[2,2],[3,2],[2,3],[3,3]],
+      // canonical period-3 pulsar (13x13), 48 cells
+      pulsar: [[2,0],[3,0],[4,0],[8,0],[9,0],[10,0],
+               [0,2],[0,3],[0,4],[0,8],[0,9],[0,10],
+               [5,2],[5,3],[5,4],[5,8],[5,9],[5,10],
+               [7,2],[7,3],[7,4],[7,8],[7,9],[7,10],
+               [12,2],[12,3],[12,4],[12,8],[12,9],[12,10],
+               [2,5],[3,5],[4,5],[8,5],[9,5],[10,5],
+               [2,7],[3,7],[4,7],[8,7],[9,7],[10,7],
+               [2,12],[3,12],[4,12],[8,12],[9,12],[10,12]]
+    };
+    const cells = P[name];
+    if (!cells) return s;
+    let maxX = 0, maxY = 0;
+    for (const [x, y] of cells){ if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+    const ox = Math.floor(maxX / 2), oy = Math.floor(maxY / 2);
+    this.clear(s);
+    for (const [x, y] of cells) this.set(s, cx + x - ox, cy + y - oy, 1);
+    return s;
+  },
+  // serialize live cells to a compact key for cycle detection
+  fingerprint(s){
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < s.grid.length; i++){
+      h ^= s.grid[i];
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = Life;
+</script>
+
+<script>
+// ===== UI =====
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W = 80, H = 80, PX = cv.width / W;
+  let state = Life.create(W, H);
+  let timer = null, running = false;
+
+  function draw(){
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#3fb950';
+    for (let y = 0; y < H; y++){
+      for (let x = 0; x < W; x++){
+        if (state.grid[y * W + x]) ctx.fillRect(x * PX, y * PX, PX - 0.5, PX - 0.5);
+      }
+    }
+    document.getElementById('gen').textContent = state.gen;
+    document.getElementById('pop').textContent = Life.pop(state);
+  }
+  function play(){
+    if (running) return;
+    running = true;
+    document.getElementById('play').textContent = '⏸ 暂停';
+    const sp = +document.getElementById('speed').value;
+    timer = setInterval(() => { Life.step(state); draw(); }, 1000 / sp);
+  }
+  function pause(){
+    running = false; clearInterval(timer); timer = null;
+    document.getElementById('play').textContent = '▶ 播放';
+  }
+  document.getElementById('play').onclick = () => running ? pause() : play();
+  document.getElementById('step').onclick = () => { pause(); Life.step(state); draw(); };
+  document.getElementById('clear').onclick = () => { pause(); Life.clear(state); draw(); };
+  document.getElementById('rand').onclick = () => {
+    pause();
+    const seed = document.getElementById('seed').value || ('r' + Date.now());
+    const d = +document.getElementById('dens').value / 100;
+    Life.random(state, seed, d); draw();
+  };
+  document.querySelectorAll('[data-pat]').forEach(b => {
+    b.onclick = () => { pause(); Life.putPattern(state, b.dataset.pat); draw(); };
+  });
+  document.getElementById('seedbtn').onclick = () => {
+    pause();
+    const seed = document.getElementById('seed').value || '晨星';
+    const d = +document.getElementById('dens').value / 100;
+    Life.random(state, seed, d); draw();
+  };
+  document.getElementById('speed').oninput = e => {
+    if (running){ pause(); const sp = +e.target.value; timer = setInterval(() => { Life.step(state); draw(); }, 1000 / sp); running = true; document.getElementById('play').textContent = '⏸ 暂停'; }
+  };
+  document.getElementById('dens').oninput = e => { document.getElementById('densv').textContent = (e.target.value / 100).toFixed(2); };
+
+  document.getElementById('selftest').onclick = () => {
+    const out = [];
+    const T = (name, cond) => out.push((cond ? '<span class="ok">✓</span> ' : '<span class="bad">✗</span> ') + name);
+    // block still life
+    let s = Life.create(10, 10); Life.putPattern(s, 'block');
+    const pop0 = Life.pop(s);
+    Life.step(s);
+    T('方块静物：1 代后存活数不变 (' + pop0 + '→' + Life.pop(s) + ')', Life.pop(s) === pop0 && pop0 === 4);
+    // blinker period 2
+    s = Life.create(10, 10); Life.putPattern(s, 'blinker');
+    const f0 = Life.fingerprint(s);
+    Life.step(s); Life.step(s);
+    T('闪烁器：周期 2（2 代复原）', Life.fingerprint(s) === f0 && Life.pop(s) === 3);
+    // glider translates after 4 gens
+    s = Life.create(20, 20); Life.putPattern(s, 'glider');
+    const g0 = Life.fingerprint(s);
+    for (let i = 0; i < 4; i++) Life.step(s);
+    T('滑翔机：4 代后平移（形状保持）', Life.fingerprint(s) !== g0 && Life.pop(s) === 5);
+    // empty stays empty
+    s = Life.create(8, 8); Life.clear(s); Life.step(s);
+    T('空白网格：永远为空', Life.pop(s) === 0);
+    // deterministic seed
+    const a = Life.create(40, 40); Life.random(a, '晨星', 0.33);
+    const b = Life.create(40, 40); Life.random(b, '晨星', 0.33);
+    T('确定性：同种子→同宇宙', Life.fingerprint(a) === Life.fingerprint(b));
+    const c = Life.create(40, 40); Life.random(c, '别的', 0.33);
+    T('不同种子→不同宇宙', Life.fingerprint(a) !== Life.fingerprint(c));
+    // pulsar period 3
+    s = Life.create(30, 30); Life.putPattern(s, 'pulsar');
+    const pf0 = Life.fingerprint(s);
+    for (let i = 0; i < 3; i++) Life.step(s);
+    T('脉冲星：周期 3', Life.fingerprint(s) === pf0);
+    document.getElementById('selfcheck').innerHTML = out.join('<br>');
+  };
+
+  // initial demo
+  Life.random(state, '晨星', 0.33); draw();
+})();
+</script>
+</body>
+</html>

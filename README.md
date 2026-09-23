@@ -1,5 +1,12 @@
 # LifeForge · 生命游戏锻造炉
 
+<p align="center">
+  <a href="https://github.com/CJX0712/life-forge/actions/workflows/ci.yml"><img src="https://github.com/CJX0712/life-forge/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <a href="https://github.com/CJX0712/life-forge/releases"><img src="https://img.shields.io/github/v/release/CJX0712/life-forge?sort=semver" alt="release"></a>
+  <a href="https://github.com/CJX0712/life-forge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/CJX0712/life-forge" alt="license"></a>
+  <img src="https://img.shields.io/badge/author-%E6%99%A8%E6%98%9F-1f6feb" alt="author">
+</p>
+
 单文件离线运行的康威生命游戏（Conway's Game of Life）实验台。标准 **B3/S23** 规则、环面（toroidal）边界、确定性种子、内置经典图案库与一键自检。
 
 > 同一个种子永远生成同一片混沌宇宙；同一个图案永远演化出同一段生命周期。
